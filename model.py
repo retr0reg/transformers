@@ -10,12 +10,15 @@ def get_device():
 
 # hyperparameters
 
-block_size = 8
+block_size = 256 # previous was 8
 # NOTE: when 8 individuals, there are only 7 combinations (since a token can't be by itself)
 # NOTE: when setting a block_size of n, that means we need to truncate after n, since the machine never looked at anything more than n
-batch_size = 4 # how many blocks we will deal with at the same time?
-n_embd     = 32
+batch_size = 64 # how many blocks we will deal with at the same time? (previous was 4)
+n_embd     = 6*64 # 64 is the number of heads
+n_head     = 6
+n_layer    = 6
 
+dropout       = 0.2 # chance of dropping out a neuron
 max_iters     = 5000
 learning_rate = 1e-3
 eval_iters    = 200
@@ -36,6 +39,7 @@ class Head(nn.Module):
                 block_size, block_size # bck_sz * bck_sz
             )
         ))
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor):
         B, T, C = x.shape
@@ -47,6 +51,7 @@ class Head(nn.Module):
         qk *= 1/sqrt(k.size(-1)) # scaled attension to keep softmax diffused but saturated
         qk = qk.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # no future tokens
         qk = F.softmax(qk, dim=-1) # softmax on last axis: for a given query, softmax of keys
+        qk = self.dropout(qk)
 
         v: torch.Tensor = self.value(x)
 
@@ -61,7 +66,7 @@ class MultiHead(nn.Module):
 
     def forward(self, x):
         x = torch.cat([head(x) for head in self.heads], dim=-1) # pipeline like
-        x = self.proj(x)
+        x = self.dropout(self.proj(x))
         return x
 
 class FeedForward(nn.Module): # (per-token) process token itself (updated info). (+ factual info?)
@@ -72,6 +77,7 @@ class FeedForward(nn.Module): # (per-token) process token itself (updated info).
             nn.Linear(n_embd, n_embd * 4),
             ReLU(),
             nn.Linear(n_embd * 4, n_embd), # project, back to residual connection
+            nn.Dropout(dropout)
         )
     
     def forward(self, x):
@@ -103,9 +109,7 @@ class LM(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
 
         self.blocks = nn.Sequential(
-            Block(n_embd, n_head=4),
-            Block(n_embd, n_head=4),
-            Block(n_embd, n_head=4),
+            *[Block(n_embd, n_head=n_head) for _ in range(n_layer)],
             nn.LayerNorm(n_embd),
         )
         self.lm_head         = nn.Linear(n_embd, vocab_size) # decoder language model head (latent to scoring on vocab)
