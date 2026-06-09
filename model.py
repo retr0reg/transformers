@@ -20,7 +20,7 @@ n_layer    = 6
 
 dropout       = 0.2 # chance of dropping out a neuron
 max_iters     = 5000
-learning_rate = 1e-3
+learning_rate = 3e-4
 eval_iters    = 200
 
 class Head(nn.Module):
@@ -152,7 +152,7 @@ class LM(nn.Module):
 
 if __name__ == "__main__":
 
-    with open('data/pg64317.txt', 'r') as fp:
+    with open('data/input.txt', 'r') as fp:
         text = fp.read()
 
     characters = sorted(list(set(text)))
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     m = model.to(get_device()) # mac m-chip
     print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-1)
 
     def get_batch(split):
         data = train if split == 'train' else validate
