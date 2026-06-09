@@ -63,6 +63,7 @@ class MultiHead(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size=head_size) for _ in range(num_heads)]) # list like
         self.proj = nn.Linear(n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         x = torch.cat([head(x) for head in self.heads], dim=-1) # pipeline like
